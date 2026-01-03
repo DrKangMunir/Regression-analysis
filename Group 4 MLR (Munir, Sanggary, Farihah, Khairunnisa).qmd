@@ -1,0 +1,805 @@
+---
+title: "Linear Regression on Quality of Life"
+author: "Munir (23202537), Farihah (23202679), Sanggary (23202894), Khairunnisa (23202532) "
+date: "`r Sys.Date()`"
+categories: [R, Linear Regression, Medical Statistics]
+tags: [R, Linear Regression, Medical Statistics]
+format: 
+  html:
+    theme: cerulean
+    toc: true
+    toc-expand: 1
+    toc-location: left
+    code-fold: true     
+    code-summary: "Show code" 
+    code-tools: true
+    number-sections: true
+    number-depth: 3
+    
+execute:
+  echo: true
+  warning: false
+  message: false
+  comment: NA
+---
+# Part A: Research question, dataset and variable creation
+
+## Research Question / Objective
+
+To study the association between physical activity, obesity, years of working, and the quality of life among adults. 
+
+Specifically, we aim to:
+
+1.   Assess the individual effects of physical activity, obesity, and years of working on quality of life.
+2.   Investigate potential interaction effects between physical activity and obesity on quality of life.
+3.   Control for confounding factors and evaluate model fit and assumptions.
+ 
+## Data simulation
+
+```{r}
+#| label: simulate-data
+#| include: true
+
+library(broom.helpers)
+
+# 1. Set seed for reproducibility
+set.seed(123)
+
+# 2. Define sample size
+n <- 200
+
+# 3. Generate Covariates
+# Years working: Uniform distribution between 0 and 40
+years_working <- runif(n, min = 0, max = 40)
+
+# Physical activity: Uniform distribution between 0 and 10
+phys_activity <- runif(n, min = 0, max = 10)
+
+# Obesity: Binary (0 = not obese, 1 = obese) with 30% prevalence
+obesity_binary <- rbinom(n, size = 1, prob = 0.3)
+obesity <- factor(obesity_binary, levels = c(0, 1), labels = c("not obese", "obese"))
+
+# 4. Define Coefficients (True Population Parameters)
+beta_0 <- 50          # Intercept (Base QoL)
+beta_1 <- -0.2        # Effect of years_working (slight decline over time)
+beta_2 <- 3.5         # Effect of phys_activity (positive impact)
+beta_3 <- -10         # Effect of obesity (negative impact)
+beta_4 <- -1.5        # Interaction: Benefit of phys_activity is reduced by 1.5 if obese
+
+# 5. Calculate Outcome (Quality of Life)
+# Formula: Y = b0 + b1*X1 + b2*X2 + b3*X3 + b4*(X2*X3) + error
+noise <- rnorm(n, mean = 0, sd = 5) # Random error
+
+qol_raw <- beta_0 +
+  (beta_1 * years_working) +
+  (beta_2 * phys_activity) +
+  (beta_3 * obesity_binary) +
+  (beta_4 * phys_activity * obesity_binary) + # The Interaction Term
+  noise
+
+# 6. Enforce Bounds (0-100)
+# Truncate values to ensure they stay within the scale
+qol <- pmax(0, pmin(100, qol_raw))
+
+# 7. Create Dataframe
+df <- data.frame(
+  id = 1:n,
+  qol = round(qol, 1),
+  years_working = round(years_working, 1),
+  phys_activity = round(phys_activity, 1),
+  obesity = obesity
+)
+
+```
+
+Generate QoL dataset (n=200) with:
+
+- ranges: qol 0-100, years_working 0-40, phys_activity 0-10
+- obesity as factor with 2 levels
+- interaction: phys_activity * obesity
+
+## Data Preparation- Glimpse the generated data
+
+### Load libraries
+```{r}
+#| label: load-libraries
+
+library(tidyverse)
+library(here)
+library(tidyr)
+library(GGally)
+library(broom)
+library(interactions)
+library(car)
+library(summarytools)
+library(lmtest)
+library(performance)
+library(gtsummary)
+library(data.table)
+library(labelled)
+library(gt)
+library(data.table)
+```
+
+### Data structure and exploration
+
+```{r}
+#| label: data structure exploration
+#| include: true
+
+
+glimpse(df)
+```
+
+*Interpretation* : 
+The structure of the data shows that 'years_working', 'phys_activity' and 'quality of life' are numeric variables while 'obesity' is a factor with two levels.
+
+### Label variables
+
+The variables were labeled for clarity as follows: 
+years_working as "Years of Working", phys_activity as "Physical Activity Score", obesity as "Obesity Status", and qol as "Quality of Life".
+
+```{r}
+#| label: label-variables
+#| include: true
+
+var_label(df$years_working) <- "Years of Working"
+var_label(df$phys_activity) <- "Physical Activity Score"
+var_label(df$obesity) <- "Obesity Status"
+var_label(df$qol) <- "Quality of Life"
+```
+
+
+# Part B: Exploratory Data Analysis
+
+## Descriptive statistics
+
+We inspect the central tendency and dispersion of the variables.
+
+```{r}
+#| label: summary-stats
+#| tab-cap: "Summary Statistics"
+
+#descriptive analysis
+print(dfSummary(df[,c("qol","years_working","phys_activity","obesity")],  
+                style        = "grid",  
+                varnumbers   = FALSE,
+                valid.col    = FALSE
+),
+method = "render")
+```
+
+*Interpretation* : 
+Outcome Variable (Quality of Life):
+
+The average Quality of Life (QOL) score is 58.1 ($SD = 13.7$), ranging from a low of 26.8 to a high of 90.2. The graph suggests the scores are relatively normally distributed (bell-shaped) around the mean.
+
+Continuous Predictors:
+
+Years Working: Participants have worked for an average of 20.3 years ($SD = 11.0$), spanning a full range from new entrants (0 years) to those with near-maximum tenure (39.8 years). The small histogram shows a fairly flat (uniform) distribution, meaning there is a good mix of people with different experience levels.
+
+Physical Activity: The mean physical activity score is 4.9 ($SD = 2.9$) on a scale of 0–10. Similar to years working, this variable covers the full range (0.1 to 10) and is widely distributed.
+
+Categorical Predictor :
+
+Obesity:The sample is predominantly non-obese, with 69.5% ($n=139$) classified as "not obese" and 30.5% ($n=61$) classified as "obese." This provides a sufficient sample size in both groups to compare differences.
+
+## Visualizations
+### Histograms for Continuous Variables
+
+```{r}
+#| label: histograms
+#| fig-cap: "Distribution of Continuous Variables"
+
+df %>%
+  select(qol, years_working, phys_activity) %>%
+  pivot_longer(everything(), names_to = "Variable", values_to = "Value") %>%
+  ggplot(aes(x = Value)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "white") +
+  facet_wrap(~Variable, scales = "free") +
+  theme_minimal() +
+  labs(title = "Histograms of Continuous Variables", y = "Frequency")
+```
+
+*Interpretation* :
+The Physical Activity score and years of working exhibit approximately symmetric distributions. In contrast, the QoL scores demonstrate a pronounced right skew (concentration of values at the lower end). This skewness suggests that while most participants reported moderate quality of life, some participants have relatively good quality of life. 
+
+
+### Box Plots by Categorical Variable (Obesity)
+
+```{r}
+#| label: boxplots
+#| fig-cap: "Box Plots by Obesity Status"
+
+df %>%
+  select(obesity, qol, years_working, phys_activity) %>%
+  pivot_longer(cols = -obesity, names_to = "Variable", values_to = "Value") %>%
+  ggplot(aes(x = obesity, y = Value, fill = obesity)) +
+  geom_boxplot() +
+  facet_wrap(~Variable, scales = "free_y") +
+  theme_minimal() +
+  labs(title = "Box Plots by Obesity Status")
+
+```
+
+*Interpretation* : 
+The box plot confirms a distinct separation between groups specifically in quality of life subgroup. The non-obese group exhibits a substantially higher median and elevated interquartile range compared to the obese group. However, there are no noticeable difference in the physical activity and years of working subgroups (overlapped box plots)
+
+### Scatter Plots (QoL vs. Predictors)
+
+```{r}
+#| label: scatterplots
+#| fig-cap: "Relationships between Continuous Variables"
+
+# QoL vs Years Working
+p1 <- ggplot(df, aes(x = years_working, y = qol)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  theme_minimal() +
+  labs(title = "QoL vs Years Working")
+
+# QoL vs Physical Activity (colored by Obesity to see interaction)
+p2 <- ggplot(df, aes(x = phys_activity, y = qol)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  theme_minimal() +
+  labs(title = "QoL vs Physical Activity ")
+
+print(p1)
+print(p2)
+
+```
+
+*Interpretation* :
+Years working shows a negative correlation with QOL , while physical activity shows a positive linear relationship.
+
+
+### Correlation Matrix 
+
+```{r}
+#| label: correlation
+#| fig-cap: "Correlation Matrix"
+
+# Select only numeric columns
+numeric_vars <- df %>% select(qol, years_working, phys_activity)
+
+# Generate Correlation Matrix
+numeric_vars %>% ggpairs()
+```
+
+*Interpretation* :
+Strong Positive Relationship: There is a strong, highly significant correlation (0.718) between phys_activity and qol. This indicates that as physical activity increases, Quality of Life scores tend to rise substantially.
+
+Weak Negative Relationship: There is a weak negative correlation (-0.139) between years_working and qol. This suggests that longer work duration is associated with a slight decrease in Quality of Life, though the relationship is not very strong.
+
+Independence of Predictors: The correlation between years_working and phys_activity is negligible (-0.052). This confirms that there is no linear relationship between these two independent variables, meaning multicollinearity is not a concern for the regression model.
+
+
+# Part C: Regression Analysis
+
+## Univariable analysis
+We first assess the individual association of each predictor with QOL.
+
+### Years of working
+
+```{r}
+#| label: univariable-years-working
+#| include: true
+#| tab-cap: "Univariable Model - Years of Working"
+
+mod_year <-lm(qol~ years_working, data= df)
+
+tbl_regression(mod_year, intercept = TRUE) %>%
+  bold_p(t = 0.05) %>%
+  as_gt() %>%
+  tab_header(
+    title = "Table 1: Univariable Model - Years of Working"
+  )
+```
+
+### Physical activity
+
+```{r}
+#| label: univariable-phys-activity
+#| include: true
+#| tab-cap: "Univariable Model - Physical Activity"
+
+mod_pa<- lm(qol~ phys_activity, data= df)
+
+tbl_regression(mod_pa, intercept = TRUE) %>%
+  bold_p(t = 0.05) %>%
+  as_gt() %>%
+  tab_header(
+    title = "Table 2: Univariable Model - Physical Activity"
+  )
+```
+
+### Obesity
+
+```{r}
+#| label: univariable-obesity
+#| include: true
+#| tab-cap: "Univariable Model - Obesity"
+
+mod_obs<- lm(qol~ obesity, data= df)
+
+tbl_regression(mod_obs, intercept = TRUE) %>%
+  bold_p(t = 0.05) %>%
+  as_gt() %>%
+  tab_header(
+    title = "Table 3: Univariable Model - Obesity"
+  )
+```
+
+*Interpretation* : 
+Physical activity and obesity status are significantly associated with QOL(p values: <0.05). Whereas years of working is marginally related to quality of life (p value:0.05).
+
+
+## Handling potential confounder
+```{r}
+mod_pa<- lm(qol~ phys_activity, data= df)
+
+mod_pa_years<- lm(qol~ phys_activity + years_working, data= df)
+
+mod_pa_obs<- lm(qol~ phys_activity + obesity, data= df)
+
+
+coef_pa <- tidy(mod_pa)$estimate[2]
+coef_pa_years <- tidy(mod_pa_years)$estimate[2]
+coef_pa_obs <- tidy(mod_pa_obs)$estimate[2]
+percent_change_year <- ((coef_pa - coef_pa_years) / coef_pa) * 100
+percent_change_obs <- ((coef_pa - coef_pa_obs) / coef_pa) * 100
+percent_change_year
+percent_change_obs
+```
+
+*Interpretation* :
+The change in the coefficient for physical activity when adjusting for years_working and obesity is relatively small (less than 20%). This suggests that while years_working and obesity are independent predictors of QoL, they do not act as confounders for the relationship between physical activity and QoL.
+
+
+## Multivariable analysis
+We fit two models:
+
+### model 1: full model (main effects only).
+
+```{r}
+#| label: full model
+mod_full<- lm(qol~ obesity + phys_activity + years_working, data= df)
+
+tbl_regression(mod_full, intercept = TRUE) %>%
+  bold_p(t = 0.05) %>%
+  as_gt() %>%
+  tab_header(
+    title = "Table 6: Full Model (main effects only)"
+  )
+
+```
+
+### model 2: full model + interaction between physical activity and obesity.
+
+```{r}
+#| label: full model + intreraction between physical activity and obesity
+
+mod_pa.obs<- lm(qol~ phys_activity + years_working + obesity + phys_activity:obesity, data= df)
+
+tbl_regression(mod_pa.obs, intercept = TRUE) %>%
+  bold_p(t = 0.05) %>%
+  as_gt() %>%
+  tab_header(
+    title = "Table 7: Full Model + Interaction Term"
+  )
+```
+
+## Model comparison
+
+```{r}
+#| label: model-comparison
+
+# Likelihood Ratio Test
+anova(mod_full, mod_pa.obs)
+
+```
+
+
+*Interpretation* : 
+
+Model Comparison: Why Model 2 is Better
+
+The Analysis of Variance (ANOVA) table provides strong statistical evidence that Model 2 (Table 7; with interaction) is superior to Model 1 (Table 6; main effects only).
+
+Lower Residual Sum of Squares (RSS): Model 2 has a lower RSS (5063.1) compared to Model 1 (5932.4). A lower RSS indicates that Model 2 has smaller prediction errors and fits the observed data more closely than Model 1.
+
+Statistically Significant Improvement: The ANOVA comparison shows a highly significant p-value (2.834e-08, denoted as ***), which confirms that the reduction in error (RSS) achieved by adding the interaction term is statistically significant.
+
+Improved Explanatory Power ($R^2$): The performance table confirms that Model 2 explains a higher proportion of the variance in the data ($R^2$ = 0.864) compared to Model 1 ($R^2$ = 0.841).
+
+# Part D: Model Checking
+We perform diagnostics on Model 2 to check assumptions and identify influential outliers
+
+## Check assumptions
+
+### Linearity 
+
+```{r}
+#| label: linearity 
+#| include: true
+
+plot(mod_pa.obs, which = 1)
+```
+
+*Interpretation* : 
+The Residuals vs Fitted plot confirms the linearity assumption is satisfied, as the red smoothing line is horizontal and centers closely on zero across the entire range of fitted values. This indicates no non-linear patterns, such as U-shapes or curves, suggesting the linear model appropriately captures the relationship between the predictors and the outcome.
+
+### Normality of residuals
+
+```{r}
+#| label: normality of residuals 
+#| include: true
+
+plot(mod_pa.obs, which = 2)
+```
+
+*Interpretation* :
+While central points align with the diagonal, there are some slight deviations in the tails and head (e.g 71,156, 116). 
+
+### Homocedasticity (Scale-Location)
+
+```{r}
+#| label: homocedasticity (scale-location)
+#| include: true
+
+par(mfrow = c(1, 2))
+plot(mod_pa.obs, which = c(1,3))
+```
+*Interpretation* :
+A slight trend is visible, but no severe convergence or divergence is observed. This suggests that variance is relatively constant.
+
+### Independence of residues
+
+```{r}
+#| label: Independence of residues
+
+dwtest(mod_pa.obs)
+
+```
+
+*Interpretation* : 
+The Durbin-Watson test ($p > 0.05$) suggests no significant autocorrelation.
+
+
+## Influential Analysis
+We identify influential points using Cook's Distance, DFBETAS, and Leverage.
+
+### Cook's Distance 
+
+```{r}
+#| label: Cook's Distance
+
+par(mfrow = c(1, 1))
+cutoff <- 4/nrow(df)
+plot(mod_pa.obs, which = 4, cook.levels = cutoff)
+
+```
+
+*Interpretation*: 
+This plot measures the overall influence of each observation on the model's fitted values.
+
+Observation 127 has the highest spike (Cook's distance $\approx 0.10$), followed by observations 156 and 72. Since all values are well below the conventional threshold of 1 (and generally low even for stricter thresholds like $4/n$), these points are influential but not problematic enough to invalidate the model.
+
+
+### Leverage Points
+
+```{r}
+#| label: Leverage Points
+
+plot(mod_pa.obs, which=5)
+```
+*Interpretation*: 
+This plot helps identify influential data points by comparing standardized residuals against leverage (how extreme the predictor values are).
+
+Most data points cluster to the left, indicating low leverage. Observation 127 stands out in the upper right corner, meaning it has both high leverage and a relatively large residual. However, it does not cross the critical Cook's distance contours (the dashed lines usually set at 0.5 or 1), suggesting it is not severely distorting the model despite being an outlier.
+
+
+### DFBETAS 
+
+```{r}
+#| label: DFBETAS
+ 
+dfbetaPlots(mod_pa.obs)
+```
+
+*Interpretation* : 
+This plot shows how much each regression coefficient would change if a single observation were removed.
+
+The scatterplots for all four terms (phys_activity, years_working, obesity, and the interaction) show random patterns centered around zero. There are no extreme spikes exceeding standard thresholds, confirming that the estimated coefficients are stable and not driven by any single data point.
+
+## Remedial Measures
+We remove the identified influential observations and refit the model
+
+### Remove influential observations and refit the model
+
+```{r}
+#| label: illustrate-cooks-distance
+#| fig-cap: "Identifying Influential Observations for Removal"
+
+# Calculate the cutoff for influential points (Cook's Distance)
+# A common threshold is 4/n, where n is the number of observations
+cutoff <- 4 / nrow(df)
+
+df_plot <- augment(mod_pa.obs, df) %>%
+  mutate(Status = ifelse(.cooksd > cutoff, "Influential (Remove)", "Normal (Keep)"))
+
+ggplot(df_plot, aes(x = id, y = .cooksd, fill = Status)) +
+  geom_bar(stat = "identity", width = 0.5) +      
+  geom_hline(yintercept = cutoff, linetype = "dashed", color = "red") + 
+  
+  
+  scale_fill_manual(values = c("Influential (Remove)" = "firebrick", "Normal (Keep)" = "gray70")) +
+  
+
+  labs(title = "Cook's Distance: Selection of Points for Removal",
+       subtitle = paste("Red dashed line indicates cutoff threshold:", round(cutoff, 4)),
+       x = "Observation ID",
+       y = "Cook's Distance") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
+
+```{r}
+#| label: refit-model
+
+cutoff <- 4 / nrow(df)
+
+# Augment the model to get Cook's Distance (.cooksd) for every point
+df_augmented <- augment(mod_pa.obs, df)
+
+# Filter out points that exceed the cutoff
+# We keep rows where .cooksd is LESS than the cutoff
+df_no_outliers <- df_augmented %>% 
+  filter(.cooksd < cutoff)
+
+# Refit the model using this cleaned dataset
+mod_pa.obs_refit <- lm(qol ~ phys_activity + obesity + years_working + phys_activity:obesity, data = df_no_outliers)
+
+# Summarize and compare
+tidy(mod_pa.obs_refit)
+compare_performance(mod_pa.obs, mod_pa.obs_refit, rank = TRUE)
+```
+
+*Interpretation* : 
+Removing the influential observations identified by Cook's Distance didn't drastically change the results, which confirms that our original model was solid to begin with.
+
+Coefficient Stability: The estimates for the predictors were very stable. For example, the effect of physical activity remained virtually unchanged (Original $\beta = 3.6$ vs. Refitted $\beta = 3.60$). 
+
+Crucially, the interaction term also stayed almost exactly the same, shifting only slightly from -1.6 to -1.63.
+
+Model Fit ($R^2$): We did see an improvement in how well the model fits the data. The Adjusted $R^2$ rose from 0.862 to 0.890, and the prediction error (RMSE) dropped from 5.031 to 4.332. This suggests that the influential points were adding some "noise" to the model, but taking them out didn't change the underlying trends.
+
+Conclusion:This sensitivity analysis gives us confidence in the results. It proves that the relationships we found, specifically the interaction between obesity and physical activity,are real and reliable, rather than being driven by a handful of extreme cases.
+
+# Part E: Results Presentation and Interpretation
+
+## Final regression table
+
+```{r}
+#| label: Final Model
+
+final_tbl <- tbl_regression(
+  mod_pa.obs,
+  intercept = TRUE,
+  conf.level = 0.95,
+  label = list(years_working = "Years of working",
+               phys_activity = "Physical activity",
+               obesity = "Obesity",
+               qol = "Quality of life"),
+  pvalue_fun = ~style_pvalue(.x, digits = 3, eps = 0.001),
+  estimate_fun = ~style_number(.x, digits = 2)
+) %>% 
+  add_glance_table(
+    include = c(r.squared, adj.r.squared, statistic),
+    label = list(statistic = "F-statistic")
+  ) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>% 
+  modify_header(
+    label = "**Variables**",
+    estimate = "**Adj. Beta**",
+    std.error = "**SE**",
+    statistic = "**t-stat**"
+  ) %>% 
+  modify_column_unhide(c(std.error, statistic)) %>% 
+  modify_table_body(
+    ~ .x %>%  dplyr::relocate(std.error, .after = estimate) %>% 
+      dplyr::relocate(statistic, .before = p.value)
+  ) %>% 
+  modify_caption("**Multivariable Linear Regression Model for Quality of Life Score (QOL)**") %>%  
+  as_gt() %>%
+  opt_align_table_header(align = "left") %>%
+  tab_options(
+    table.border.top.style = "none",
+    table.border.bottom.style = "none",
+    heading.border.bottom.style = "solid",
+    heading.border.bottom.color = "black",
+    table_body.border.top.color = "black",
+    table_body.border.bottom.style = "solid",
+    table_body.border.bottom.color = "black",
+    table_body.hlines.style = "none",
+    column_labels.border.top.style = "solid",
+    column_labels.border.top.width = px(2),
+    column_labels.border.top.color = "black",
+    column_labels.border.bottom.style = "solid",
+    column_labels.border.bottom.width = px(2),
+    column_labels.border.bottom.color = "black",
+    data_row.padding = px(5)
+  ) %>%
+  tab_style(
+    style = cell_text(align = "right"),
+    locations = cells_body(columns = -label)
+  ) %>%
+  opt_align_table_header(align = "left")
+final_tbl
+```
+
+## Final model equation
+
+The final linear regression model on quality of life is given by the equation:
+
+
+$$
+\text{QOL} = 50.59 
++ 3.58 \space (\text{Physical Activity}) 
+- 0.24 \space (\text{Years Working}) 
+- 9.25 \space (\text{Obese}) 
+- 1.62 \space (\text{Physical Activity} \times \text{Obese}) 
++ \varepsilon
+$$
+
+Where:
+
+-   QOL: Quality of Life score (outcome variable)
+-   Physical Activity: Physical activity score (predictor)
+-   Years Working: Number of years working (predictor)
+-   Obese: Indicator variable for obesity status (1 = obese, 0 = not
+obese)
+-   $\varepsilon$: Error term capturing unexplained variability
+
+
+## Interaction Plot 
+```{r}
+#| label: Interaction plot of the final model
+
+interact_plot(mod_pa.obs, pred = phys_activity, modx = obesity
+              , plot.points = TRUE, interval = TRUE)
+```
+
+*Interpretation* : 
+The interaction plot demonstrates significant effect modification, characterized by heterogeneity of regression slopes where the positive association between physical activity and QOL is attenuated in the obese group ($\beta \approx 2.0$) relative to the non-obese group ($\beta \approx 3.6$). This differential marginal effect confirms that while physical activity yields positive outcomes for all, the rate of improvement is statistically constrained by obesity status, resulting in a widening disparity at higher activity levels.
+
+
+## Interpretation of Final Model Results
+
+### Main Effects and Interaction Terms
+
+The final model identifies several statistically significant predictors on quality of life:
+
+-   **Years Working**: There is a significant negative association between employment duration and quality of life ($\beta = -0.24, p < 0.001$). For every additional year of working, the Quality of Life score decreases by 0.24 units.
+
+
+-   **Physical Activity**: Physical activity is a strong positive predictor. For non-obese individuals (the reference group), each 1-unit increase in physical activity score is associated with a 3.6 unit increase in Quality of Life ($\beta = 3.6, p < 0.001$).
+
+-   **Obesity**: Obesity is associated with a significantly lower baseline Quality of Life. When physical activity is zero, obese individuals have a Quality of Life score that is 9.3 points lower than non-obese individuals ($\beta = -9.3, p < 0.001$).
+
+-   **Interaction (Physical Activity × Obesity)**: The significant negative interaction term ($\beta = -1.6, p < 0.001$) indicates that obesity dampens the beneficial effect of exercise. While physical activity improves Quality of Life for everyone, the rate of improvement is slower for obese individuals, who gain only 2.0 points ($3.6 - 1.6$) per unit of activity compared to 3.6 points for non-obese individuals.
+
+### Model Comparison
+
+Compared to the main effects model (Model 1), the final model including the interaction term (Model 2) demonstrates superior fit and explanatory power:
+
+ - **Statistical Significance**:The Analysis of Variance (ANOVA) comparison reveals that adding the interaction term significantly reduced the Residual Sum of Squares (RSS) from 5932.4 to 5063.1 ($F = 33.48, p < 0.001$). This confirms that the interaction between physical activity and obesity provides a statistically significant improvement in predicting Quality of Life.
+
+ - **Explanatory Power**:The inclusion of the interaction term increased the $R^2$ from 0.841 to 0.864, indicating that the final model explains a larger proportion (approximately 86.4%) of the variance in the outcome compared to the main effects model.
+
+### Practical Significance
+
+The findings have clear implications:
+
+-   **Workplace Wellness**: The significant negative association between Years Working ($\beta = -0.24$) and Quality of Life implies that long-term employment is associated with a cumulative decline in well-being. This highlights the practical need for workplace wellness initiatives and stress management programs for employees with longer tenure.
+
+-   **Integrated Health Interventions**: The Interaction term ($\beta = -1.6$) reveals that obesity not only lowers baseline Quality of Life but also dampens the positive effects of physical activity. Practically, this means "one size fits all" exercise recommendations may be less effective for obese individuals. Interventions should prioritize weight management alongside physical activity to unlock the steeper "Quality of Life return" observed in non-obese individuals.
+
+### Model Assumptions and Diagnostics
+
+Model checking revealed:
+
+-   **Linearity**: The Residuals vs Fitted plot shows a red smoothing line that is approximately horizontal and centered on zero, indicating that the linear relationship between the predictors and Quality of Life is correctly specified and the linearity assumption is satisfied. 
+
+-   **Normality**: The Q-Q plot demonstrates that the standardized residuals align closely with the theoretical diagonal line across the entire range of quantiles. Although there are slight deviations at the extreme tails (specifically observations 156, 116, and 71), the overall pattern is straight and lacks significant skewness or heavy tails. This indicates that the residuals are approximately normally distributed, satisfying the normality assumption.
+
+-   **Homoscedasticity**: The Scale-Location plot reveals that the vertical spread of the standardized residuals remains relatively consistent across the range of fitted values. There is no evidence of divergence (expanding variance) or convergence (contracting variance) in the residuals as the predicted values increase. This stability in the error terms confirms that the assumption of homoscedasticity is satisfied.
+
+### Influential Observations and their impact on model prediction:
+
+The influential observations (127, 156, 72) introduce some noise but do not compromise the validity of the model's predictions. The model remains robust, and the relationships identified (such as the interaction between obesity and physical activity) hold true regardless of whether these points are included.
+
+# Prediction
+
+## New data simulation
+
+To visualize the model's predictions across a representative range of scenarios, we generated a new dataset (new_data) using a factorial grid that combines key values for years_working (0, 20, 40 years), phys_activity (0 to 10 in steps of 2), and both obesity levels.
+
+```{r}
+#| label: new data simulation
+
+new_data <- expand.grid(
+  years_working = seq(0, 40, by = 20),
+  phys_activity = seq(0, 10, by = 2),
+  obesity = c("not obese", "obese")
+)
+
+new_data %>% data.table()
+
+```
+
+## Fitted values 
+
+We then applied the final regression model to the new dataset to compute the predicted Quality of Life scores and their corresponding 95% confidence intervals for each hypothetical scenario.
+
+```{r}
+#| label: Fitted values
+predict<- augment (mod_pa.obs, newdata = new_data, interval="confidence",level = 0.95)
+
+
+predict %>%
+  gt() %>%
+  tab_header(
+    title = "Predicted QOL on New Dataset",
+  ) 
+```
+
+## Prediction visualization
+
+Finally, we plotted the results to visualize how physical activity improves Quality of Life for obese versus non-obese individuals, separating the graphs by years of working to clearly compare the trends across different career lengths.
+
+```{r}
+ggplot(predict, aes(x = phys_activity, y = .fitted, color = obesity, fill = obesity)) +
+  # Add confidence intervals (Ribbons)
+  geom_ribbon(aes(ymin = .lower, ymax = .upper), alpha = 0.2, color = NA) +
+  # Add regression lines
+  geom_line(linewidth = 1) +
+  # Facet by years_working to show the relationship across career lengths
+  facet_grid(~ years_working, labeller = label_both) + 
+  scale_color_brewer(palette = "Set2") + 
+  scale_fill_brewer(palette = "Set2") +
+  theme_minimal(base_size = 12) +
+  labs(
+    title = "Predicted Quality of Life by Physical Activity and Obesity Status",
+    subtitle = "Stratified by Years Working (Model Predictions with 95% CIs)",
+    y = "Predicted QOL Score (0-100)",
+    x = "Physical Activity Score (0-10)",
+    color = "Group",
+    fill = "Group"
+  ) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+```
+
+
+
+*Interpretation* :
+Positive Effect of Physical Activity: Across all three panels (0, 20, and 40 years of working), there is a clear linear increase in Quality of Life (QOL) as physical activity scores rise from 0 to 10. This confirms that physical activity is beneficial for everyone, regardless of tenure or obesity status.
+
+Cumulative Negative Effect of Years Working: By comparing the panels from left to right, we observe a systematic downward shift in QOL scores.
+
+0 Years Working: The baseline QOL starts relatively high (around 40-50 for obese, 50-60 for non-obese).
+
+40 Years Working: The entire set of lines shifts down by approximately 10 points. This visualizes the cumulative burden of long-term employment, where individuals with high tenure have significantly lower well-being compared to new entrants, holding other factors constant.
+
+
+
+# Conclusion
+Physical activity is beneficial for everyone, but the return on investment is higher for non-obese individuals. However, because obese individuals start with a lower baseline QOL, physical activity remains a crucial intervention, even if the rate of improvement is slower. The gap in QOL between the groups widens at higher activity levels. Public health interventions should prioritize physical activity for all, but distinct strategies are required for obese individuals. Since they face a "double burden" of lower baseline QOL and a slower return on investment from exercise, integrated approaches combining activity with weight management may be necessary to maximize their Quality of Life outcomes. 
+
