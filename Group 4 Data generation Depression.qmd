@@ -1,0 +1,75 @@
+---
+title: "Group 4 Data generation Depression"
+author: "Munir (23202537), Farihah (23202679), Sanggary (23202894), Khairunnisa (23202532) "
+date: "`r Sys.Date()`"
+categories: [R, Logistic Regression, Medical Statistics]
+tags: [R, Logistic Regression, Medical Statistics]
+format: 
+  html:
+    theme: cerulean
+    toc: true
+    toc-expand: 1
+    toc-location: left
+    code-fold: true     
+    code-summary: "Show code" 
+    code-tools: true
+    number-sections: true
+    number-depth: 3 
+    
+execute:
+  echo: true
+  warning: false
+  message: false
+  comment: NA
+---
+
+# Data Generation for Depression Study
+
+Generate a dataset with 200 observations containing the following variables:
+
+-   Outcome variables: depression (binary, 0 = no depression, 1 = depression)
+-   Covariates:
+    -   years_working (continious, ranging 0-40 years)
+    -   phys_activity (Physical activity score, continious, range 0-10)
+    -   obesity (binary, 0 = not obese, 1 = obese)
+-   Include an interaction effect between phys_activity and obesity on depression.
+
+```{r}
+set.seed(3030)
+n <- 200
+
+years_working <- round(runif(n, 0, 40), 1)
+phys_activity <- round(runif(n, 0, 10), 1)
+phys_c <- phys_activity - mean(phys_activity)
+
+# More balanced obesity prevalence
+obesity <- rbinom(n, 1, 0.45)
+
+# Coefficients tuned for moderate ORs
+b1 <- 0.06
+b2 <- -0.30
+b3 <- 0.5    # obesity OR ≈ 1.65
+b4 <- -0.20  # weaker interaction
+
+# Calibrate intercept for ~25% prevalence
+mean_prev <- function(b0){
+  lp <- b0 + b1*years_working + b2*phys_c + b3*obesity + b4*phys_c*obesity
+  mean(plogis(lp))
+}
+b0 <- uniroot(function(x) mean_prev(x) - 0.25, interval = c(-8, 2))$root
+
+linpred <- b0 + b1*years_working + b2*phys_c + b3*obesity + b4*phys_c*obesity
+p <- plogis(linpred)
+p <- pmin(pmax(p, 0.05), 0.95)   # clamp to avoid separation
+y <- rbinom(n, 1, p)
+
+depression_data <- data.frame(
+  years_working, phys_activity, obesity, depression = y
+)
+
+head(depression_data)
+
+# export to CSV
+write.csv(depression_data, "depression_data.csv", row.names = FALSE)
+```
+

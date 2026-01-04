@@ -1,0 +1,91 @@
+---
+title: "Group 4 Data generation MLR"
+author: "Munir (23202537), Farihah (23202679), Sanggary (23202894), Khairunnisa (23202532) "
+date: "`r Sys.Date()`"
+categories: [R, Linear Regression, Medical Statistics]
+tags: [R, Linear Regression, Medical Statistics]
+format: 
+  html:
+    theme: cerulean
+    toc: true
+    toc-expand: 1
+    toc-location: left
+    code-fold: true     
+    code-summary: "Show code" 
+    code-tools: true
+    number-sections: true
+    number-depth: 3
+    
+execute:
+  echo: true
+  warning: false
+  message: false
+  comment: NA
+---
+
+## Simulating Data for Multiple Linear Regression Analysis
+
+Generate QoL dataset (n=200) with:
+
+- ranges: qol 0-100, years_working 0-40, phys_activity 0-10
+- obesity as factor with 2 levels
+- interaction: phys_activity * obesity
+
+```{r}
+#| label: simulate-data
+#| include: true
+
+library(broom.helpers)
+
+# 1. Set seed for reproducibility
+set.seed(123)
+
+# 2. Define sample size
+n <- 200
+
+# 3. Generate Covariates
+# Years working: Uniform distribution between 0 and 40
+years_working <- runif(n, min = 0, max = 40)
+
+# Physical activity: Uniform distribution between 0 and 10
+phys_activity <- runif(n, min = 0, max = 10)
+
+# Obesity: Binary (0 = not obese, 1 = obese) with 30% prevalence
+obesity_binary <- rbinom(n, size = 1, prob = 0.3)
+obesity <- factor(obesity_binary, levels = c(0, 1), labels = c("not obese", "obese"))
+
+# 4. Define Coefficients (True Population Parameters)
+beta_0 <- 50          # Intercept (Base QoL)
+beta_1 <- -0.2        # Effect of years_working (slight decline over time)
+beta_2 <- 3.5         # Effect of phys_activity (positive impact)
+beta_3 <- -10         # Effect of obesity (negative impact)
+beta_4 <- -1.5        # Interaction: Benefit of phys_activity is reduced by 1.5 if obese
+
+# 5. Calculate Outcome (Quality of Life)
+# Formula: Y = b0 + b1*X1 + b2*X2 + b3*X3 + b4*(X2*X3) + error
+noise <- rnorm(n, mean = 0, sd = 5) # Random error
+
+qol_raw <- beta_0 +
+  (beta_1 * years_working) +
+  (beta_2 * phys_activity) +
+  (beta_3 * obesity_binary) +
+  (beta_4 * phys_activity * obesity_binary) + # The Interaction Term
+  noise
+
+# 6. Enforce Bounds (0-100)
+# Truncate values to ensure they stay within the scale
+qol <- pmax(0, pmin(100, qol_raw))
+
+# 7. Create Dataframe
+df <- data.frame(
+  id = 1:n,
+  qol = round(qol, 1),
+  years_working = round(years_working, 1),
+  phys_activity = round(phys_activity, 1),
+  obesity = obesity
+)
+
+# export to csv
+write.csv(df, "group4_mlr_data.csv", row.names = FALSE)
+```
+
