@@ -23,7 +23,7 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 
 ---
 
-## 📘 Overview
+## Overview
 
 - Examines how work-related and lifestyle factors relate to **quality of life (continuous)** and **depression (binary)** outcomes using multiple linear and multiple logistic regression on simulated data.  
 - Uses **R**, **Quarto**, and **tidyverse-based workflows** to demonstrate data simulation, EDA, model building, interaction terms, diagnostics, and interpretation.  
@@ -31,7 +31,7 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 
 ---
 
-## 👥 Contributors
+## Contributors
 - DR. NAZIRUL MUNIR BIN ABU HASSAN (23202537)
 - DR. NURFARIHAH ZULKIFLI (23202679)
 - DR. KHAIRUNNISA BINTI ARIFFIN (23202532)
@@ -39,7 +39,7 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 
 ---
 
-## 📂 Folder Structure
+## Folder Structure
 
 Layout within this repository:
 
@@ -61,13 +61,13 @@ Layout within this repository:
 
 ---
 
-## 📄 Published Analysis in Posit-Connect
+## Published Analysis in Posit-Connect
 - [Linear Regression Analysis](https://posit-connect.kk.usm.my/content/2987b23e-f1f1-47ef-a116-90260349bf05)  
 - [Logistic Regression Analysis](https://posit-connect.kk.usm.my/content/b9144dca-f26c-4d55-91ca-6085d73494db)
  
 ---
 
-## ⚙️ Installation
+## Installation
 
 ### Prerequisites
 
@@ -103,7 +103,7 @@ install.packages(c(
 
 ---
 
-## ▶️ Usage
+## Usage
 
 ### 1. Multiple Logistic Regression (Part 1)
 
@@ -133,7 +133,7 @@ This generates `Group4_MLR.html` with the simulated QoL dataset, EDA, multiple l
 
 ---
 
-## 📊 Data
+## Data
 
 All datasets are **fully simulated** for educational purposes and contain no real participant data.
 
@@ -159,7 +159,7 @@ A more detailed data dictionary can be included in each HTML report or a separat
 
 ---
 
-## 📈 Results
+## Results
 
 - **Logistic regression:** Odds ratios, ROC curves, diagnostics, and interpretation in `Group4_MLogR.html`.  
 - **Linear regression:** Coefficient estimates, assumption checks, diagnostics, and interpretation in `Group4_MLR.html`.  
@@ -171,7 +171,7 @@ Key learning outcomes:
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 This repository is part of a course assignment; external contributions are not accepted.  
 
@@ -179,7 +179,7 @@ For corrections or suggestions, please contact the group members or instructor w
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the **MIT License**.  
 See the top-level `LICENSE` file for full details.
