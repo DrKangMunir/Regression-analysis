@@ -24,19 +24,19 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 
 ---
 
-## 👥 Contributors
-- Dr. Kang Munir  
-- Sanggary  
-- Farihah  
-- Khairul  
-
----
-
 ## 📘 Overview
 
 - Examines how work-related and lifestyle factors relate to **quality of life (continuous)** and **depression (binary)** outcomes using multiple linear and multiple logistic regression on simulated data.  
-- Uses **R**, **Quarto/R Markdown**, and **tidyverse-based workflows** to demonstrate data simulation, EDA, model building, interaction terms, diagnostics, and interpretation.  
+- Uses **R**, **Quarto**, and **tidyverse-based workflows** to demonstrate data simulation, EDA, model building, interaction terms, diagnostics, and interpretation.  
 - Status: Stable teaching example for the GDT500 Regression Analysis group assignment (Group 4).
+
+---
+
+## 👥 Contributors
+- DR. NAZIRUL MUNIR BIN ABU HASSAN (23202537)
+- DR. NURFARIHAH ZULKIFLI (23202679)
+- DR. KHAIRUNNISA BINTI ARIFFIN (23202532)
+- DR. SANGGARY MARIMUTHU (23202894)
 
 ---
 
@@ -62,9 +62,9 @@ Layout within this repository:
 
 ---
 
-## 📄 Published Reports
-- [Linear Regression Report](https://posit-connect.kk.usm.my/content/dd4f266c-ca4b-45b9-91b3-a7064444874a)  
-- [Logistic Regression Report](https://posit-connect.kk.usm.my/content/6f3c7710-f751-495d-baf4-80ec79ab0cc1)  
+## 📄 Published Analysis in Posit-Connect
+- [Linear Regression Analysis](https://posit-connect.kk.usm.my/content/2987b23e-f1f1-47ef-a116-90260349bf05)  
+- [Logistic Regression Analysis](https://posit-connect.kk.usm.my/content/6f3c7710-f751-495d-baf4-80ec79ab0cc1](https://posit-connect.kk.usm.my/content/b9144dca-f26c-4d55-91ca-6085d73494db))  
 
 ---
 
@@ -184,4 +184,3 @@ For corrections or suggestions, please contact the group members or instructor w
 
 This project is licensed under the **MIT License**.  
 See the top-level `LICENSE` file for full details.
-```
