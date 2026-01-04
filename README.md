@@ -13,7 +13,7 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 - [Overview](#overview)
 - [Contributors](#contributors)
 - [Folder Structure](#folder-structure)
-- [Published Reports](#published-reports)
+- [Published Analysis in Posit-Connect](#published-analysis-in-posit-connect)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Data](#data)
@@ -63,8 +63,8 @@ Layout within this repository:
 
 ## 📄 Published Analysis in Posit-Connect
 - [Linear Regression Analysis](https://posit-connect.kk.usm.my/content/2987b23e-f1f1-47ef-a116-90260349bf05)  
-- [Logistic Regression Analysis](https://posit-connect.kk.usm.my/content/6f3c7710-f751-495d-baf4-80ec79ab0cc1](https://posit-connect.kk.usm.my/content/b9144dca-f26c-4d55-91ca-6085d73494db))  
-
+- [Logistic Regression Analysis](https://posit-connect.kk.usm.my/content/b9144dca-f26c-4d55-91ca-6085d73494db)
+ 
 ---
 
 ## ⚙️ Installation
