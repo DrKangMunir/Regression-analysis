@@ -1,7 +1,7 @@
 ##  Regression Analysis Assignment
 
 ###  Contributors
-Group 4: Munir, Sanggary, Farihah, Khairul, [add others if needed]
+Group 4: Munir (23202537), Farihah (23202679), Sanggary (23202894), Khairunnisa (23202532)
 
 ###  Contents
  `Group 4 MLR`  Multiple linear regression analysis and results
