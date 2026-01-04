@@ -10,7 +10,6 @@ Reproducible multiple **logistic** and multiple **linear** regression analyses u
 
 ## 📑 Table of Contents
 
-
 - [Overview](#overview)
 - [Contributors](#contributors)
 - [Folder Structure](#folder-structure)
